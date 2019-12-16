@@ -1,0 +1,298 @@
+1. GraphAttentionNetwork(GAT)提出了用注意力机制对邻近节点特征加权求和;GAT和GCN的核心区别在于如何收集并累和距离为1的邻居节点的特征表示;
+    本质上，GAT只是将原本GCN的标准化函数替换为使用注意力权重的邻居节点特征聚合函数。
+2. GAT与GCN同样也是一个特征提取器，针对的是N个节点，按照其输入的节点特征预测输出新的节点的特征。
+3. 什么是self−attention机制？
+  self−attention其作用是能够更好地学习到全局特征之间的依赖关系，self−attention通过直接计算图结构中任意两个节点之间的关系，一步到位地获取图结构的
+  全局几何特征。利用了attention机制，分三个阶段进行计算：(1) 引入不同的函数和计算机制，根据Query和某个Keyi，计算两者的相似性或者相关性，
+  最常见的方法包括：求两者的向量点积、求两者的向量Cosine相似性或者通过再引入额外的神经网络来求值；(2) 引入类似softmax的计算方式对第一阶段的得分进行
+  数值转换，一方面可以进行归一化，将原始计算分值整理成所有元素权重之和为111的概率分布；另一方面也可以通过softmax的内在机制更加突出重要元素的权重；
+  (3)第二阶段的计算结果ai即为valuei对应的权重系数，然后进行加权求和即可得到attention数值。
+4. softmax + 交叉熵 +  梯度下降 = GAT
+5. 什么是multi−headattention
+多个self−attention结构的结合，每个head学习到在不同表示空间中的特征，多个head学习到的attention侧重点可能略有不同，这样给了模型更大的容量
+6. masked attention的含义是：仅将注意力分配到节点iii的邻居节点集上
+7.神经网络激活函数
+  1）sigmoid 1/(1+e-x) 可以解释（0-1取值可以解释成概率）；但是有饱和区域，在大的正数和负数作为输入的时候，梯度就会变成零，使得神经元基本不能更新。
+  2）tanh
+  3) Relu
+  4) leakyRelu
+  5) PReLU
+  6) Maxout
+  7) Softmax
+8.CNN
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import torch
+import torch.nn as nn
+# from model_xgboost import flag
+import torch.nn.functional as F
+from torch.autograd import Variable
+import torch.optim as optim
+from torchvision import datasets, transforms
+from torch.utils.data import Dataset
+from PIL import Image
+import numpy
+import matplotlib.pyplot as plt
+import os
+from torch.utils.data.sampler import WeightedRandomSampler
+import numpy as np
+import csv
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# 多分类CNN
+
+
+class LeNet(nn.Module):
+    def __init__(self, cuda):
+        super(LeNet, self).__init__()
+        # input(3*640*427)
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1),
+            # output 32*640*427
+            # padding = (kernel_size-1)/2
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            # output 32*320*213
+        )
+
+        self.conv2 = nn.Sequential(
+            # input 32*320*213
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            # output 64*320*213
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            # output 64*160*106
+        )
+        self.conv3 = nn.Sequential(
+            # input 64*160*106
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            # output 128*160*106
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            # output 128*80*53
+        )
+        self.conv4 = nn.Sequential(
+            # input 128*80*53
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
+            # output 256*80*53
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=4),
+            # output 256*20*13
+        )
+        self.conv5 = nn.Sequential(
+            # input 256*20*13
+            nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1),
+            # output 512*20*13
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=4),
+            # output 512*5*3
+        )
+        self.fc1 = nn.Sequential(
+            nn.Linear(512*5*3, 512*5*3),
+            nn.Dropout(0.5),
+            nn.ReLU(),
+            )
+        self.fc2 = nn.Linear(512*5*3, 3)
+        self.use_cuda = cuda
+        if cuda:
+            self.cuda()
+
+    def forward(self, x):
+        # print x.size()
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        x = self.conv4(x)
+        x = self.conv5(x)
+        # print(x.shape)
+        x = x.view(x.size(0), -1)  # fit the batch_size
+        # print(x.shape)
+        x = self.fc1(x)
+        x = self.fc2(x)
+        return x
+
+
+class yourDataset(Dataset):
+
+    def __init__(self, txt_path, transform=None, target_transform=None):
+
+        self.transform = transform
+        self.target_transform = target_transform
+        fh = open(txt_path, 'r')
+        imgs = []
+        for line in fh:
+            line = line.rstrip()
+            words = line.split()
+            img = Image.open(words[0]).convert('RGB')
+            if self.transform is not None:
+                img = self.transform(img)
+            imgs.append((img, words[0]))
+        self.imgs = imgs
+
+    def __getitem__(self, index):
+        img, label = self.imgs[index]
+        return img, label
+
+    def __len__(self):
+        return len(self.imgs)
+
+class myDataset(Dataset):
+
+    def __init__(self, txt_path, transform=None, target_transform=None):
+
+        self.transform = transform
+        self.target_transform = target_transform
+        fh = open(txt_path, 'r')
+        imgs = []
+        for line in fh:
+            line = line.rstrip()
+            words = line.split()
+            img = Image.open(words[0]).convert('RGB')
+            if self.transform is not None:
+                img = self.transform(img)
+            imgs.append((img, int(words[1])-1))
+        self.imgs = imgs
+
+    def __getitem__(self, index):
+        img, label = self.imgs[index]
+        return img, label
+
+    def __len__(self):
+        return len(self.imgs)
+
+def train(model, train_loader, epochs):
+    model.train()
+    optimizer = optim.SGD(model.parameters(), lr=0.015,momentum=0.78)
+    loss_fc = nn.CrossEntropyLoss()
+    for epoch in range(epochs):
+        for batch_idx, (data, target) in enumerate(train_loader):
+            if model.use_cuda:
+                data, target = data.cuda(), target.cuda()
+            data, target = Variable(data), Variable(target)
+            optimizer.zero_grad()
+            # print("target", target)
+            output = model(data)
+            # print("output", output)
+            # print(target.shape)
+            loss = loss_fc(output, target)
+
+            pred = output.data.max(1)[1]
+            # print("pred",pred)
+
+            loss.backward()
+            optimizer.step()
+            if batch_idx % 1000 == 0:
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                    epoch, batch_idx * len(data), len(train_loader.dataset),
+                    100. * batch_idx / len(train_loader), loss.item()))
+    PATH= "./3class_model_imgs.ph"
+    torch.save(model,PATH)
+
+
+def test(model, test_loader):
+    model.eval()
+    test_loss = 0
+    correct = 0
+    loss_fc = nn.CrossEntropyLoss()
+    for data, target in test_loader:
+        if model.use_cuda:
+            data, target = data.cuda(), target.cuda()
+        with torch.no_grad():
+            data, target = Variable(data), Variable(target)
+            output = model(data)
+            test_loss += loss_fc(output, target).item()  # Variable.data
+            # get the index of the max log-probability
+            pred = output.data.max(1)[1]
+            print("pred", pred)
+            correct += pred.eq(target.data).cpu().sum()
+
+    test_loss = test_loss
+    # loss function already averages over batch size
+    test_loss /= len(test_loader)
+    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+        test_loss, correct, len(test_loader.dataset),
+        100. * correct / len(test_loader.dataset)))
+
+def predict(dataLoader):
+    PATH= "./3class_model.ph"
+    path="./id_tags_multiclass_9999.csv"
+    dict_pre={}
+    model=torch.load(PATH)
+    model.eval()
+    for data, target in dataLoader:
+        # print(data,target)
+        # print(len(target))
+        path_str=[]
+        if model.use_cuda:
+            data= data.cuda()
+        for ii in range(len(target)):
+                path_str.append(target[ii][17:(len(target[ii])-7)])
+        print(len(path_str))
+        with torch.no_grad():
+            data = Variable(data)
+            output = model(data)
+            # test_loss += loss_fc(output, target).item()  # Variable.data
+            # get the index of the max log-probability
+            pred = output.data.max(1)[1]
+            tag=pred.cpu().data.numpy()
+            # tag=[1,1,1,1,1,1,1]
+            print("tag",len(tag))
+            for i in range(len(tag)):
+                dict_pre[path_str[i]]=tag[i]
+    with open(path,"w",newline='') as f:
+        file_writer=csv.writer(f)
+        for key,value in dict_pre.items():
+            file_writer.writerow([key,value])
+
+if __name__ == "__main__":
+    # normMean = [0.426791, 0.4127726, 0.3950154]
+    # normStd = [0.25277323, 0.24792522, 0.2502895]
+    normMean = [0.426791, 0.4127726, 0.3950154]
+    normStd = [0.25277323, 0.24792522, 0.2502895]
+    '''dataset=myDataset("./train_3_v2.txt",
+                  transform=transforms.Compose([
+                    transforms.CenterCrop((426,640)),
+                      transforms.ToTensor(),
+                      transforms.Normalize(normMean, normStd)
+                  ]))
+    class_sample_count = np.array([1081, 638, 210])
+    weight = 1. / class_sample_count
+    samples_weight = [weight[i] for i in range(3) for data,label in dataset if label==i]
+    sampler = WeightedRandomSampler(samples_weight,1700)
+    train_loader = torch.utils.data.DataLoader(
+        myDataset("./train_3_v2.txt",
+                  transform=transforms.Compose([
+                    transforms.CenterCrop((426,640)),
+                      transforms.ToTensor(),
+                      transforms.Normalize(normMean, normStd)
+                  ])),batch_size=30, sampler=sampler)'''
+    '''train_loader = torch.utils.data.DataLoader(
+        myDataset("./train_3.txt",
+                  transform=transforms.Compose([
+                      transforms.ToTensor(),
+                      transforms.Normalize(normMean, normStd)
+                  ])),
+        batch_size=30, sampler=sampler)
+    test_loader = torch.utils.data.DataLoader(
+        myDataset("./test_3.txt",
+                  transform=transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(normMean, normStd)
+                  ])),
+        batch_size=30)'''
+    pre_loader = torch.utils.data.DataLoader(
+        yourDataset("./path_9999.txt",
+                  transform=transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Normalize(normMean, normStd)
+                  ])),
+        batch_size=30)
+    # cuda = True
+    # print(test_loader)
+    # model = LeNet(cuda)
+    # train(model, train_loader, epochs=100)
+    # test(model, test_loader)
+    predict(pre_loader)
+
+
+
