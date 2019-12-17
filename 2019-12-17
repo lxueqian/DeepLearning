@@ -1,0 +1,8 @@
+1. one-hot向量的存储
+稀疏矩阵类型 coo_matrix / csr_matrix 
+coo_matrix存储密度相对小，但易于手工构建，常用方法为先手工构建coo_matrix，如果对内存要求高则使用 tocsr() 方法把coo_matrix转换为csr_matrix类型
+就是分别定义有那些非零元素，以及各个非零元素对应的row和col，最后定义稀疏矩阵的shape
+ma = scipy.sparse.coo_matrix((data,(row,col)),shape=(4,4),dtype=np.float32)
+ma.tocsr().toarray()
+
+
