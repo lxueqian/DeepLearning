@@ -5,4 +5,10 @@ coo_matrix存储密度相对小，但易于手工构建，常用方法为先手�
 ma = scipy.sparse.coo_matrix((data,(row,col)),shape=(4,4),dtype=np.float32)
 ma.tocsr().toarray()
 
+2. Lstm
+  LSTM 的关键就是细胞状态，水平线在图上方贯穿运行。
+  STM 有通过精心设计的称作为“门”的结构来去除或者增加信息到细胞状态的能力。门是一种让信息选择式通过的方法。他们包含一个 sigmoid 神经网络层和一个
+  pointwise 乘法操作。
+  双向LSTM是有两层lstm然后同时双向输入
+
 
