@@ -1,14 +1,37 @@
 1. one-hot向量的存储
-稀疏矩阵类型 coo_matrix / csr_matrix 
-coo_matrix存储密度相对小，但易于手工构建，常用方法为先手工构建coo_matrix，如果对内存要求高则使用 tocsr() 方法把coo_matrix转换为csr_matrix类型
-就是分别定义有那些非零元素，以及各个非零元素对应的row和col，最后定义稀疏矩阵的shape
-ma = scipy.sparse.coo_matrix((data,(row,col)),shape=(4,4),dtype=np.float32)
-ma.tocsr().toarray()
+  稀疏矩阵类型 coo_matrix / csr_matrix 
+  coo_matrix存储密度相对小，但易于手工构建，常用方法为先手工构建coo_matrix，如果对内存要求高则使用 tocsr() 方法把coo_matrix转换为csr_matrix类型
+  就是分别定义有那些非零元素，以及各个非零元素对应的row和col，最后定义稀疏矩阵的shape
+  ma = scipy.sparse.coo_matrix((data,(row,col)),shape=(4,4),dtype=np.float32)
+  ma.tocsr().toarray()
 
 2. Lstm
   LSTM 的关键就是细胞状态，水平线在图上方贯穿运行。
   STM 有通过精心设计的称作为“门”的结构来去除或者增加信息到细胞状态的能力。门是一种让信息选择式通过的方法。他们包含一个 sigmoid 神经网络层和一个
   pointwise 乘法操作。
   双向LSTM是有两层lstm然后同时双向输入
+  
+3. 动态神经网络自动问答
+  
+
+4. 双向LSTM 预测英文小短文（tensorflow）
+   利用shape调整输入
+   _x = tf.placeholder(tf.int32,shape=[None,32])
+   input_x = tf.split(_x,num_or_size_splits=number_time_steps,axis=1) 
+   需要获取最后一个时刻（批次）的输出
+   处理输入（文章转换为列表并且使用索引表示）-定义模型和输出(输入需要进行时间处理）-定义损失函数-构建优化器-训练（加载数据，网络构建，损失函数，优化器，
+   执行图运行：需要设置batch_size和time,打印结果）
+   
+5.哑变量编码直观的解释就是任意的将一个状态位去除
+6.深度学习-李宏毅
+  （1）全连接层   两层之间的w可以组成一个矩阵 b组成一个向量
+                  第l层第i个神经元的激活函数输入 
+  （2）循环连接层  同一个层反复使用 有记忆的神经网络
+                   输入输出都是两个向量 （保持维度相同）
+                   每次的输出都加入到下一次输入
+                   深度RNN
+                   双向RNN 需要三个函数
+                   金字塔RNN 越往上每个block的输入是前一层好几个block的output
+                   RNN 简单f: f=sig(WH+WX)
 
 
